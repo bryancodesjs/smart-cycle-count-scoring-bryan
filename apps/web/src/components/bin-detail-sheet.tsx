@@ -35,8 +35,8 @@ type Props = {
 
 export function BinDetailSheet({ warehouse, bin, open, onOpenChange }: Props) {
   const { movePallet, error } = useWarehouse();
-  const [selectedPalletId, setSelectedPalletId] = useState<string>("");
-  const [targetBinId, setTargetBinId] = useState<string>("");
+  const [selectedPalletId, setSelectedPalletId] = useState<string | undefined>();
+  const [targetBinId, setTargetBinId] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -53,8 +53,8 @@ export function BinDetailSheet({ warehouse, bin, open, onOpenChange }: Props) {
     setLocalError(null);
     try {
       await movePallet(selectedPalletId, targetBinId);
-      setSelectedPalletId("");
-      setTargetBinId("");
+      setSelectedPalletId(undefined);
+      setTargetBinId(undefined);
     } catch (e) {
       setLocalError(e instanceof Error ? e.message : "Move failed");
     } finally {
