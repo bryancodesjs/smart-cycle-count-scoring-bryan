@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Warehouse {
+  id            String   @id @default(cuid())
+  name          String
+  aisleCount    Int
+  racksPerAisle Int
+  binsPerRack   Int
+  createdAt     DateTime @default(now())
+  aisles        Aisle[]
+}
+
+model Aisle {
+  id          String    @id @default(cuid())
+  code        String
+  aisleIndex  Int
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  racks       Rack[]
+
+  @@index([warehouseId])
+}
+
+model Rack {
+  id         String @id @default(cuid())
+  code       String
+  aisleIndex Int
+  rackIndex  Int
+  aisleId    String
+  aisle      Aisle  @relation(fields: [aisleId], references: [id], onDelete: Cascade)
+  bins       Bin[]
+
+  @@index([aisleId])
+}
+
+model Bin {
+  id            String   @id @default(cuid())
+  code          String
+  aisleIndex    Int
+  rackIndex     Int
+  binIndex      Int
+  riskScore     Int      @default(0)
+  lastCheckedAt DateTime @default(now())
+  rackId        String
+  rack          Rack     @relation(fields: [rackId], references: [id], onDelete: Cascade)
+  pallets       Pallet[]
+
+  @@index([rackId])
+  @@index([riskScore])
+}
+
+model Pallet {
+  id       String   @id @default(cuid())
+  skuLabel String
+  movedAt  DateTime @default(now())
+  binId    String
+  bin      Bin      @relation(fields: [binId], references: [id], onDelete: Cascade)
+
+  @@index([binId])
+}
