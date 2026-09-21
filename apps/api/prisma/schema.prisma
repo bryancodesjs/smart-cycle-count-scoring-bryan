@@ -8,13 +8,14 @@ datasource db {
 }
 
 model Warehouse {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   name          String
   aisleCount    Int
   racksPerAisle Int
   binsPerRack   Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime    @default(now())
   aisles        Aisle[]
+  auditPlans    AuditPlan[]
 }
 
 model Aisle {
@@ -41,19 +42,25 @@ model Rack {
 }
 
 model Bin {
-  id            String   @id @default(cuid())
-  code          String
-  aisleIndex    Int
-  rackIndex     Int
-  binIndex      Int
-  riskScore     Int      @default(0)
-  lastCheckedAt DateTime @default(now())
-  rackId        String
-  rack          Rack     @relation(fields: [rackId], references: [id], onDelete: Cascade)
-  pallets       Pallet[]
+  id                       String              @id @default(cuid())
+  code                     String
+  aisleIndex               Int
+  rackIndex                Int
+  binIndex                 Int
+  riskScore                Int                 @default(0)
+  factorDaysSinceChecked   Int                 @default(0)
+  factorRecentMovement     Int                 @default(0)
+  factorOccupancy          Int                 @default(0)
+  lastCheckedAt            DateTime            @default(now())
+  rackId                   String
+  rack                     Rack                @relation(fields: [rackId], references: [id], onDelete: Cascade)
+  pallets                  Pallet[]
+  activities               InventoryActivity[]
+  auditTasks               AuditTask[]
 
   @@index([rackId])
   @@index([riskScore])
+  @@index([code])
 }
 
 model Pallet {
@@ -64,4 +71,64 @@ model Pallet {
   bin      Bin      @relation(fields: [binId], references: [id], onDelete: Cascade)
 
   @@index([binId])
+}
+
+enum ActivityType {
+  PUTAWAY
+  PICK
+  ADJUST
+  MOVE
+}
+
+model InventoryActivity {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  binId     String
+  bin       Bin          @relation(fields: [binId], references: [id], onDelete: Cascade)
+  palletId  String?
+  note      String?
+  createdAt DateTime     @default(now())
+
+  @@index([binId])
+  @@index([createdAt])
+}
+
+enum TaskStatus {
+  PENDING
+  DONE
+}
+
+enum AuditPassFail {
+  PASS
+  FAIL
+}
+
+model AuditPlan {
+  id          String      @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse   @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  topN        Int
+  createdAt   DateTime    @default(now())
+  tasks       AuditTask[]
+
+  @@index([warehouseId])
+}
+
+model AuditTask {
+  id                String         @id @default(cuid())
+  planId            String
+  plan              AuditPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  binId             String
+  bin               Bin            @relation(fields: [binId], references: [id], onDelete: Cascade)
+  status            TaskStatus     @default(PENDING)
+  riskScoreAtCreate Int
+  sortOrder         Int
+  expectedQuantity  Int?
+  countedQuantity   Int?
+  result            AuditPassFail?
+  completedAt       DateTime?
+
+  @@index([planId])
+  @@index([binId])
+  @@index([status])
 }
