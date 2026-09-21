@@ -18,27 +18,38 @@ type Props = {
 
 export function WarehouseGrid({ warehouse, selectedBinId, onSelectBin }: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      {warehouse.aisles.map((aisle) => (
-        <section key={aisle.id} className="min-w-0">
-          <div className="mb-2 flex items-baseline justify-between gap-2">
-            <h2 className="font-mono text-sm font-semibold tracking-wide">
-              Aisle {aisle.code}
-            </h2>
-            <span className="text-muted-foreground font-mono text-[10px]">
-              {aisle.racks.length} racks ·{" "}
-              {aisle.racks.reduce((n, r) => n + r.bins.length, 0)} bins
-            </span>
-          </div>
+    <div className="border-border/50 from-muted/30 to-background rounded-xl border bg-linear-to-b p-2.5 sm:p-3">
+      <div className="flex flex-col gap-2 sm:gap-2.5">
+        {warehouse.aisles.map((aisle) => (
+          <section
+            key={aisle.id}
+            className="flex min-w-0 items-stretch gap-2 sm:gap-3"
+            aria-label={`Aisle ${aisle.code}`}
+          >
+            <div className="flex w-9 shrink-0 flex-col justify-center sm:w-11">
+              <h2 className="font-mono text-[10px] font-semibold tracking-wide sm:text-xs">
+                {aisle.code}
+              </h2>
+              <span className="text-muted-foreground font-mono text-[8px] sm:text-[9px]">
+                {aisle.racks.length}R
+              </span>
+            </div>
 
-          <div className="border-border/50 from-muted/40 to-background overflow-x-auto rounded-xl border bg-linear-to-b p-3 sm:p-4">
-            <div className="flex min-w-max gap-3 sm:gap-4">
+            <div
+              className="grid min-w-0 flex-1 gap-1 sm:gap-1.5"
+              style={{
+                gridTemplateColumns: `repeat(${aisle.racks.length}, minmax(0, 1fr))`,
+              }}
+            >
               {aisle.racks.map((rack) => (
-                <div key={rack.id} className="flex w-[7.5rem] shrink-0 flex-col gap-2 sm:w-32">
-                  <div className="text-muted-foreground truncate text-center font-mono text-[10px] tracking-wider uppercase">
+                <div
+                  key={rack.id}
+                  className="flex min-w-0 flex-col gap-0.5"
+                >
+                  <div className="text-muted-foreground truncate text-center font-mono text-[8px] tracking-wider uppercase sm:text-[9px]">
                     {rack.code.split("-").pop()}
                   </div>
-                  <div className="flex flex-col-reverse gap-1.5">
+                  <div className="flex flex-col-reverse gap-0.5">
                     {rack.bins.map((bin) => {
                       const selected = bin.id === selectedBinId;
                       return (
@@ -48,10 +59,10 @@ export function WarehouseGrid({ warehouse, selectedBinId, onSelectBin }: Props) 
                               type="button"
                               onClick={() => onSelectBin(bin)}
                               className={cn(
-                                "relative aspect-square w-full overflow-hidden rounded-md border transition",
+                                "relative h-4 w-full overflow-hidden rounded-sm border transition sm:h-5",
                                 "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
                                 selected
-                                  ? "border-foreground ring-foreground/30 ring-2"
+                                  ? "border-foreground ring-foreground/30 ring-1"
                                   : "border-black/10 hover:brightness-110",
                               )}
                               style={{
@@ -59,8 +70,8 @@ export function WarehouseGrid({ warehouse, selectedBinId, onSelectBin }: Props) 
                               }}
                               aria-label={`Bin ${bin.code}, risk ${bin.riskScore}`}
                             >
-                              <span className="absolute inset-x-0 bottom-0 bg-black/25 py-0.5 text-center font-mono text-[9px] text-white tabular-nums">
-                                {bin.pallets.length}/{BIN_CAPACITY}
+                              <span className="sr-only">
+                                {bin.pallets.length}/{BIN_CAPACITY} pallets
                               </span>
                             </button>
                           </TooltipTrigger>
@@ -75,15 +86,15 @@ export function WarehouseGrid({ warehouse, selectedBinId, onSelectBin }: Props) 
                       );
                     })}
                   </div>
-                  {/* occupancy strip under rack — visual cue without card clutter */}
-                  <div className="bg-muted/80 mt-1 flex h-1 overflow-hidden rounded-full">
+                  <div className="bg-muted/80 mt-0.5 flex h-0.5 overflow-hidden rounded-full">
                     {rack.bins.map((bin) => (
                       <div
                         key={bin.id}
-                        className="h-full flex-1 opacity-80"
+                        className="h-full flex-1"
                         style={{
                           backgroundColor: riskScoreToColor(bin.riskScore),
-                          opacity: 0.35 + (bin.pallets.length / BIN_CAPACITY) * 0.65,
+                          opacity:
+                            0.35 + (bin.pallets.length / BIN_CAPACITY) * 0.65,
                         }}
                       />
                     ))}
@@ -91,9 +102,9 @@ export function WarehouseGrid({ warehouse, selectedBinId, onSelectBin }: Props) 
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      ))}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

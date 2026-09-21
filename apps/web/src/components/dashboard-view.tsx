@@ -70,16 +70,16 @@ export function DashboardView() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-muted-foreground font-mono text-[10px] tracking-[0.25em] uppercase">
             Operations dashboard
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+          <h1 className="mt-0.5 text-xl font-semibold tracking-tight sm:text-2xl">
             {warehouse.name}
           </h1>
-          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
+          <p className="text-muted-foreground mt-0.5 max-w-xl text-sm">
             Audit bins by risk first. Green is stable; red needs attention.
           </p>
         </div>
@@ -97,7 +97,7 @@ export function DashboardView() {
       </div>
 
       {stats ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {[
             { label: "Bins", value: stats.binCount },
             { label: "Avg risk", value: stats.avg },
@@ -106,12 +106,12 @@ export function DashboardView() {
           ].map((s) => (
             <div
               key={s.label}
-              className="border-border/60 bg-muted/30 rounded-xl border px-3 py-3"
+              className="border-border/60 bg-muted/30 rounded-lg border px-3 py-2"
             >
               <div className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
                 {s.label}
               </div>
-              <div className="mt-1 font-mono text-2xl font-semibold tabular-nums">
+              <div className="mt-0.5 font-mono text-xl font-semibold tabular-nums sm:text-2xl">
                 {s.value}
               </div>
             </div>
@@ -119,7 +119,7 @@ export function DashboardView() {
         </div>
       ) : null}
 
-      <div className="border-border/50 flex flex-wrap items-center justify-between gap-3 border-y py-3">
+      <div className="border-border/50 flex flex-wrap items-center justify-between gap-3 border-y py-2">
         <RiskLegend />
         <p className="text-muted-foreground font-mono text-[10px]">
           {warehouse.aisleCount}A × {warehouse.racksPerAisle}R ×{" "}
