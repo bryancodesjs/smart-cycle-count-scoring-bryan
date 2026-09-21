@@ -211,6 +211,29 @@ async function main() {
     }
 
     for (const a of s.activities) {
+      let palletId: string | undefined;
+      if (a.type === 'PICK') {
+        const picked = await prisma.pallet.create({
+          data: {
+            binId,
+            skuLabel: `PICKED-${s.code}-${a.daysAgo}`,
+            movedAt: daysAgo(a.daysAgo),
+          },
+        });
+        palletId = picked.id;
+        await prisma.inventoryActivity.create({
+          data: {
+            binId,
+            type: a.type,
+            palletId,
+            note: a.note,
+            createdAt: daysAgo(a.daysAgo),
+          },
+        });
+        await prisma.pallet.delete({ where: { id: picked.id } });
+        continue;
+      }
+
       await prisma.inventoryActivity.create({
         data: {
           binId,
@@ -222,19 +245,27 @@ async function main() {
     }
   }
 
-  const bins = await prisma.bin.findMany({ include: { pallets: true } });
+  const bins = await prisma.bin.findMany({
+    include: { pallets: true, activities: true },
+  });
   for (const bin of bins) {
     const breakdown = computeRiskBreakdown({
       lastCheckedAt: bin.lastCheckedAt,
-      moveTimestamps: bin.pallets.map((p) => p.movedAt),
       palletCount: bin.pallets.length,
+      activities: bin.activities.map((a) => ({
+        type: a.type,
+        createdAt: a.createdAt,
+      })),
+      lastAuditResult: bin.lastAuditResult,
     });
     await prisma.bin.update({
       where: { id: bin.id },
       data: {
         riskScore: breakdown.score,
         factorDaysSinceChecked: breakdown.factors.daysSinceChecked,
-        factorRecentMovement: breakdown.factors.recentMovement,
+        factorActivity: breakdown.factors.activity,
+        factorAdjustment: breakdown.factors.adjustment,
+        factorFailedAudit: breakdown.factors.failedAudit,
         factorOccupancy: breakdown.factors.occupancy,
       },
     });

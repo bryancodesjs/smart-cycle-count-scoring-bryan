@@ -49,8 +49,11 @@ model Bin {
   binIndex                 Int
   riskScore                Int                 @default(0)
   factorDaysSinceChecked   Int                 @default(0)
-  factorRecentMovement     Int                 @default(0)
+  factorActivity           Int                 @default(0)
+  factorAdjustment         Int                 @default(0)
+  factorFailedAudit        Int                 @default(0)
   factorOccupancy          Int                 @default(0)
+  lastAuditResult          AuditPassFail?
   lastCheckedAt            DateTime            @default(now())
   rackId                   String
   rack                     Rack                @relation(fields: [rackId], references: [id], onDelete: Cascade)

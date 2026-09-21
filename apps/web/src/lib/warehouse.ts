@@ -33,8 +33,12 @@ function buildPallets(
 function scoreBin(bin: Omit<Bin, "riskScore" | "riskBreakdown">): Bin {
   const riskBreakdown = computeRiskBreakdown({
     lastCheckedAt: bin.lastCheckedAt,
-    moveTimestamps: bin.pallets.map((p) => p.movedAt),
     palletCount: bin.pallets.length,
+    activities: bin.activities,
+    moveTimestamps: bin.activities
+      ? undefined
+      : bin.pallets.map((p) => p.movedAt),
+    lastAuditResult: bin.lastAuditResult ?? null,
   });
   return {
     ...bin,
@@ -190,10 +194,16 @@ export function movePalletLocal(
   nextTarget.pallets = [...nextTarget.pallets, moved];
 
   for (const bin of [nextSource, nextTarget]) {
+    const activity = {
+      type: "MOVE" as const,
+      createdAt: now,
+    };
+    bin.activities = [...(bin.activities ?? []), activity];
     const breakdown = computeRiskBreakdown({
       lastCheckedAt: bin.lastCheckedAt,
-      moveTimestamps: bin.pallets.map((p) => p.movedAt),
       palletCount: bin.pallets.length,
+      activities: bin.activities,
+      lastAuditResult: bin.lastAuditResult ?? null,
     });
     bin.riskScore = breakdown.score;
     bin.riskBreakdown = breakdown;

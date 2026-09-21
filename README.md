@@ -32,7 +32,7 @@ Open http://localhost:3000 — dashboard loads from the API when available; othe
 1. **Heatmap dashboard (`/`)** — color-coded bins (green → red by risk). Click a bin for score, factor breakdown (“why”), pallets, and moves.
 2. **Recompute scores** — dashboard button calls `POST /scores/recompute` and refreshes the map.
 3. **Audit plan (`/audit`)** — create Top N risky bins as tasks (`PENDING` / `DONE`).
-4. **Count flow (`/count`)** — mobile-friendly: search bin code, review expected pallets, enter counted qty, mark Pass/Fail (updates `lastCheckedAt` + recomputes that bin; completes matching plan task when present).
+4. **Count flow (`/count`)** — mobile-friendly: search or scan bin code, review expected pallets, enter counted qty, mark Pass/Fail (updates `lastCheckedAt` + last result + recomputes that bin; completes matching plan task when present).
 
 ## Risk score (v1)
 
@@ -40,9 +40,11 @@ Open http://localhost:3000 — dashboard loads from the API when available; othe
 
 | Factor | Weight | Scale |
 | --- | --- | --- |
-| Days since last checked | 45% | 0→100 over 0–30 days |
-| Recent movement (7d) | 35% | 0→100 over 0–10 pallet moves |
-| Occupancy | 20% | pallets / capacity (4) × 100 |
+| Days since last audited | 35% | 0→100 over 0–30 days |
+| Putaway / pick / move | 25% | 0→100 over 0–8 events in 30 days |
+| Adjustments | 15% | 0→100 over 0–3 adjusts in 30 days |
+| Occupancy | 15% | pallets / capacity (4) × 100 |
+| Last audit failed | 10% | 100 after FAIL until a later PASS |
 
 Factor scores are persisted on each bin and shown in the bin drawer / detail page.
 

@@ -62,7 +62,7 @@ export class PalletsService {
       for (const binId of [sourceBinId, target.id]) {
         const bin = await tx.bin.findUnique({
           where: { id: binId },
-          include: { pallets: true },
+          include: { pallets: true, activities: true },
         });
         if (!bin) continue;
         await tx.bin.update({

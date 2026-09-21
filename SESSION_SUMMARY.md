@@ -9,18 +9,18 @@
 ## PDF MVP features added
 
 ### Data / API
-- Prisma: score factor fields, inventory activities, audit plans/tasks
-- Migration `20260921000000_audit_scoring` applied
-- Seed: 30 bins, pallets, activity history
+- Prisma: score factor fields, inventory activities, audit plans/tasks, last audit result
+- Migrations applied; seed: 30 bins, pallets, activity history (picks remove stock)
 - Endpoints: recompute scores, create/get audit plan, bin lookup, count pass/fail
 
-### Scoring
+### Scoring (activity-aware)
+- Factors: days since audited, putaway/pick/move, adjustments, occupancy, last audit failed
 - Persist + show factor breakdown (“why this score”)
 - Dashboard **Recompute scores**
 
 ### Audit / count
 - **Generate audit plan** (Top N) → `/audit` task table (PENDING/DONE)
-- Mobile **Count** flow (`/count`): search bin → qty → Pass/Fail → updates check date + score
+- Mobile **Count** flow (`/count`): search or camera scan → qty → Pass/Fail → updates check date + score
 - Nav links: Dashboard, Audit, Count, Setup
 - Works LIVE (API) or LOCAL (localStorage fallback)
 
@@ -29,6 +29,6 @@
 
 ## Commands run
 ```bash
-npm run prisma:migrate   # applied
-npm run seed             # Demo Distribution Center, 30 bins
+npm run prisma:migrate
+npm run seed
 ```

@@ -4,10 +4,15 @@ export const BIN_CAPACITY = 4 as const;
 
 export type RiskScore = number; // 0 (low) – 100 (high)
 
+export type ActivityKind = "PUTAWAY" | "PICK" | "ADJUST" | "MOVE";
+export type AuditPassFail = "PASS" | "FAIL";
+
 export interface RiskFactorScores {
   daysSinceChecked: number;
-  recentMovement: number;
+  activity: number;
+  adjustment: number;
   occupancy: number;
+  failedAudit: number;
 }
 
 export interface RiskBreakdown {
@@ -15,13 +20,17 @@ export interface RiskBreakdown {
   factors: RiskFactorScores;
   weights: {
     daysSinceChecked: number;
-    recentMovement: number;
+    activity: number;
+    adjustment: number;
     occupancy: number;
+    failedAudit: number;
   };
   inputs: {
     daysSinceChecked: number;
-    recentMoveCount: number;
+    activityCount: number;
+    adjustmentCount: number;
     palletCount: number;
+    lastAuditResult: AuditPassFail | null;
   };
 }
 
@@ -29,6 +38,11 @@ export interface Pallet {
   id: string;
   skuLabel: string;
   movedAt: string; // ISO
+}
+
+export interface InventoryActivity {
+  type: ActivityKind;
+  createdAt: string; // ISO
 }
 
 export interface Bin {
@@ -39,7 +53,9 @@ export interface Bin {
   binIndex: number;
   riskScore: RiskScore;
   lastCheckedAt: string; // ISO
+  lastAuditResult?: AuditPassFail | null;
   pallets: Pallet[];
+  activities?: InventoryActivity[];
   riskBreakdown?: RiskBreakdown;
 }
 
@@ -76,7 +92,6 @@ export interface WarehouseSetupInput {
 }
 
 export type TaskStatus = "PENDING" | "DONE";
-export type AuditPassFail = "PASS" | "FAIL";
 
 export interface AuditTask {
   id: string;

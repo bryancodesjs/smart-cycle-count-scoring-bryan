@@ -127,7 +127,7 @@ export class AuditsService {
 
     const bin = await this.prisma.bin.findUnique({
       where: { id: binId },
-      include: { pallets: true },
+      include: { pallets: true, activities: true },
     });
     if (!bin) throw new NotFoundException('Bin not found');
 
@@ -139,9 +139,12 @@ export class AuditsService {
         where: { id: bin.id },
         data: {
           lastCheckedAt: now,
+          lastAuditResult: dto.result,
           ...scoreFieldsForBin({
             lastCheckedAt: now,
             pallets: bin.pallets,
+            activities: bin.activities,
+            lastAuditResult: dto.result,
           }),
         },
       });

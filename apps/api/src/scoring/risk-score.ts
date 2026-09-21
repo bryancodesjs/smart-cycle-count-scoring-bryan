@@ -1,31 +1,39 @@
 /**
- * v1 risk score formula (0–100).
+ * Risk score 0–100.
  *
- * Weights (industry-aligned: stale checks + movement dominate error likelihood;
- * occupancy approximates location density/complexity for this MVP):
- * - days since last checked: 45%
- * - recent movement (7d):    35%
- * - occupancy density:       20%
+ * 35% days since last audit (0–30 days)
+ * 25% putaway + pick + move events (last 30 days, full score at 8)
+ * 15% adjustment frequency (last 30 days, full score at 3)
+ * 15% occupancy (pallets / capacity)
+ * 10% last audit failed (100 until a later pass)
  */
 
 export const BIN_CAPACITY = 4;
 
 export const RISK_WEIGHTS = {
-  daysSinceChecked: 0.45,
-  recentMovement: 0.35,
-  occupancy: 0.2,
+  daysSinceChecked: 0.35,
+  activity: 0.25,
+  adjustment: 0.15,
+  occupancy: 0.15,
+  failedAudit: 0.1,
 } as const;
 
 export const RISK_WINDOWS = {
   maxDaysUnchecked: 30,
-  movementLookbackDays: 7,
-  maxMovesForFullScore: 10,
+  activityLookbackDays: 30,
+  maxActivityForFullScore: 8,
+  maxAdjustmentsForFullScore: 3,
 } as const;
+
+export type ActivityKind = "PUTAWAY" | "PICK" | "ADJUST" | "MOVE";
+export type AuditResult = "PASS" | "FAIL";
 
 export type RiskFactorScores = {
   daysSinceChecked: number;
-  recentMovement: number;
+  activity: number;
+  adjustment: number;
   occupancy: number;
+  failedAudit: number;
 };
 
 export type RiskBreakdown = {
@@ -34,8 +42,10 @@ export type RiskBreakdown = {
   weights: typeof RISK_WEIGHTS;
   inputs: {
     daysSinceChecked: number;
-    recentMoveCount: number;
+    activityCount: number;
+    adjustmentCount: number;
     palletCount: number;
+    lastAuditResult: AuditResult | null;
   };
 };
 
@@ -55,36 +65,53 @@ export function daysSince(date: Date, now = new Date()): number {
 
 export function computeRiskBreakdown(input: {
   lastCheckedAt: Date;
-  moveTimestamps: Date[];
   palletCount: number;
+  activities?: { type: ActivityKind; createdAt: Date }[];
+  /** Used as MOVE events when `activities` is omitted (local pallet moves). */
+  moveTimestamps?: Date[];
+  lastAuditResult?: AuditResult | null;
   now?: Date;
 }): RiskBreakdown {
   const now = input.now ?? new Date();
   const days = daysSince(input.lastCheckedAt, now);
   const daysSinceChecked = linearScale(days, RISK_WINDOWS.maxDaysUnchecked);
 
-  const lookbackMs =
-    RISK_WINDOWS.movementLookbackDays * 24 * 60 * 60 * 1000;
-  const recentMoveCount = input.moveTimestamps.filter(
-    (t) => now.getTime() - t.getTime() <= lookbackMs,
-  ).length;
-  const recentMovement = linearScale(
-    recentMoveCount,
-    RISK_WINDOWS.maxMovesForFullScore,
-  );
+  const lookbackMs = RISK_WINDOWS.activityLookbackDays * 24 * 60 * 60 * 1000;
+  const inWindow = (date: Date) => now.getTime() - date.getTime() <= lookbackMs;
 
+  const events =
+    input.activities ??
+    (input.moveTimestamps ?? []).map((createdAt) => ({
+      type: "MOVE" as const,
+      createdAt,
+    }));
+
+  const recent = events.filter((event) => inWindow(event.createdAt));
+  const activityCount = recent.filter((event) => event.type !== "ADJUST").length;
+  const adjustmentCount = recent.filter((event) => event.type === "ADJUST").length;
+
+  const activity = linearScale(activityCount, RISK_WINDOWS.maxActivityForFullScore);
+  const adjustment = linearScale(
+    adjustmentCount,
+    RISK_WINDOWS.maxAdjustmentsForFullScore,
+  );
   const occupancy = linearScale(input.palletCount, BIN_CAPACITY);
+  const failedAudit = input.lastAuditResult === "FAIL" ? 100 : 0;
 
   const factors: RiskFactorScores = {
     daysSinceChecked: Math.round(daysSinceChecked),
-    recentMovement: Math.round(recentMovement),
+    activity: Math.round(activity),
+    adjustment: Math.round(adjustment),
     occupancy: Math.round(occupancy),
+    failedAudit,
   };
 
   const raw =
     RISK_WEIGHTS.daysSinceChecked * factors.daysSinceChecked +
-    RISK_WEIGHTS.recentMovement * factors.recentMovement +
-    RISK_WEIGHTS.occupancy * factors.occupancy;
+    RISK_WEIGHTS.activity * factors.activity +
+    RISK_WEIGHTS.adjustment * factors.adjustment +
+    RISK_WEIGHTS.occupancy * factors.occupancy +
+    RISK_WEIGHTS.failedAudit * factors.failedAudit;
 
   return {
     score: Math.round(clamp(raw, 0, 100)),
@@ -92,16 +119,20 @@ export function computeRiskBreakdown(input: {
     weights: RISK_WEIGHTS,
     inputs: {
       daysSinceChecked: days,
-      recentMoveCount,
+      activityCount,
+      adjustmentCount,
       palletCount: input.palletCount,
+      lastAuditResult: input.lastAuditResult ?? null,
     },
   };
 }
 
 export function computeRiskScore(input: {
   lastCheckedAt: Date;
-  moveTimestamps: Date[];
   palletCount: number;
+  activities?: { type: ActivityKind; createdAt: Date }[];
+  moveTimestamps?: Date[];
+  lastAuditResult?: AuditResult | null;
   now?: Date;
 }): number {
   return computeRiskBreakdown(input).score;

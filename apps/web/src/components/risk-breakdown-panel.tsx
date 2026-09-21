@@ -11,21 +11,33 @@ const FACTOR_META: Array<{
 }> = [
   {
     key: "daysSinceChecked",
-    label: "Days since checked",
+    label: "Days since audited",
     hint: "Staleness over 0–30 days",
     weight: RISK_WEIGHTS.daysSinceChecked,
   },
   {
-    key: "recentMovement",
-    label: "Recent movement",
-    hint: "Moves in the last 7 days",
-    weight: RISK_WEIGHTS.recentMovement,
+    key: "activity",
+    label: "Putaway / pick / move",
+    hint: "Non-adjust events in last 30 days",
+    weight: RISK_WEIGHTS.activity,
+  },
+  {
+    key: "adjustment",
+    label: "Adjustments",
+    hint: "Adjustment events in last 30 days",
+    weight: RISK_WEIGHTS.adjustment,
   },
   {
     key: "occupancy",
     label: "Occupancy",
     hint: "Pallets vs bin capacity",
     weight: RISK_WEIGHTS.occupancy,
+  },
+  {
+    key: "failedAudit",
+    label: "Last audit failed",
+    hint: "Elevates risk until a later pass",
+    weight: RISK_WEIGHTS.failedAudit,
   },
 ];
 
@@ -77,8 +89,12 @@ export function RiskBreakdownPanel({
       </ul>
       <p className="text-muted-foreground font-mono text-[10px]">
         Inputs: {breakdown.inputs.daysSinceChecked.toFixed(1)}d stale ·{" "}
-        {breakdown.inputs.recentMoveCount} recent moves ·{" "}
+        {breakdown.inputs.activityCount} activity ·{" "}
+        {breakdown.inputs.adjustmentCount} adjusts ·{" "}
         {breakdown.inputs.palletCount} pallets
+        {breakdown.inputs.lastAuditResult
+          ? ` · last ${breakdown.inputs.lastAuditResult}`
+          : ""}
       </p>
     </div>
   );

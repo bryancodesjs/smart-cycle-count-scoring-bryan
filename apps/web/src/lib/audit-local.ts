@@ -102,10 +102,15 @@ export function completeLocalCount(
 
   const now = new Date().toISOString();
   bin.lastCheckedAt = now;
+  bin.lastAuditResult = input.result;
   const breakdown = computeRiskBreakdown({
     lastCheckedAt: bin.lastCheckedAt,
-    moveTimestamps: bin.pallets.map((p) => p.movedAt),
     palletCount: bin.pallets.length,
+    activities: bin.activities,
+    moveTimestamps: bin.activities
+      ? undefined
+      : bin.pallets.map((p) => p.movedAt),
+    lastAuditResult: input.result,
   });
   bin.riskScore = breakdown.score;
   bin.riskBreakdown = breakdown;
@@ -156,8 +161,12 @@ export function recomputeLocalWarehouse(warehouse: Warehouse): Warehouse {
   for (const bin of listBins(next)) {
     const breakdown = computeRiskBreakdown({
       lastCheckedAt: bin.lastCheckedAt,
-      moveTimestamps: bin.pallets.map((p) => p.movedAt),
       palletCount: bin.pallets.length,
+      activities: bin.activities,
+      moveTimestamps: bin.activities
+        ? undefined
+        : bin.pallets.map((p) => p.movedAt),
+      lastAuditResult: bin.lastAuditResult ?? null,
     });
     bin.riskScore = breakdown.score;
     bin.riskBreakdown = breakdown;

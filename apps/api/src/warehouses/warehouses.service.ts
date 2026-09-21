@@ -19,6 +19,7 @@ const warehouseInclude = {
             orderBy: { binIndex: 'asc' as const },
             include: {
               pallets: { orderBy: { skuLabel: 'asc' as const } },
+              activities: { orderBy: { createdAt: 'desc' as const } },
             },
           },
         },
@@ -102,7 +103,10 @@ export class WarehousesService {
   async getBin(binId: string) {
     const bin = await this.prisma.bin.findUnique({
       where: { id: binId },
-      include: { pallets: { orderBy: { skuLabel: 'asc' } } },
+      include: {
+        pallets: { orderBy: { skuLabel: 'asc' } },
+        activities: { orderBy: { createdAt: 'desc' } },
+      },
     });
     if (!bin) throw new NotFoundException('Bin not found');
     return mapBinResponse(bin);

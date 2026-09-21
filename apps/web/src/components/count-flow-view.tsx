@@ -10,7 +10,7 @@ import { RiskBadge } from "@/components/risk-legend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CircleCheckIcon } from "lucide-react";
+import { CircleCheckIcon, ScanBarcodeIcon } from "lucide-react";
 
 type LookupBin = {
   id: string;
@@ -19,6 +19,10 @@ type LookupBin = {
   lastCheckedAt: string;
   expectedQuantity: number;
   pallets: Pallet[];
+};
+
+type BarcodeDetectorLike = {
+  detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue: string }>>;
 };
 
 export function CountFlowView() {
@@ -31,9 +35,12 @@ export function CountFlowView() {
   const [lookup, setLookup] = useState<LookupBin | null>(null);
   const [countedQuantity, setCountedQuantity] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const successRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const pendingTask = useMemo(() => {
     if (!auditPlan || !taskId) return null;
@@ -55,14 +62,15 @@ export function CountFlowView() {
     }
   }, [pendingTask, lookup]);
 
-  async function searchBin() {
+  async function searchBin(codeOverride?: string) {
     setError(null);
     setSuccess(null);
-    const code = binCode.trim().toUpperCase();
+    const code = (codeOverride ?? binCode).trim().toUpperCase();
     if (!code) {
       setError("Enter a bin code to search.");
       return;
     }
+    setBinCode(code);
 
     if (source === "api") {
       setBusy(true);
@@ -108,6 +116,81 @@ export function CountFlowView() {
     });
     setCountedQuantity(bin.pallets.length);
   }
+
+  function stopScan() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setScanning(false);
+  }
+
+  async function startScan() {
+    setError(null);
+    setSuccess(null);
+
+    const Detector = (
+      window as Window & {
+        BarcodeDetector?: new (options?: {
+          formats?: string[];
+        }) => BarcodeDetectorLike;
+      }
+    ).BarcodeDetector;
+
+    if (!Detector) {
+      setError(
+        "Camera barcode scan is not supported here. Type the bin code or use a keyboard wedge scanner in the field.",
+      );
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setScanning(true);
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      const video = videoRef.current;
+      if (!video) {
+        stopScan();
+        return;
+      }
+      video.srcObject = stream;
+      await video.play();
+
+      const detector = new Detector({
+        formats: ["code_128", "qr_code", "code_39", "ean_13"],
+      });
+
+      const tick = async () => {
+        if (!streamRef.current || !videoRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          const value = codes[0]?.rawValue?.trim();
+          if (value) {
+            stopScan();
+            await searchBin(value);
+            return;
+          }
+        } catch {
+          // keep scanning
+        }
+        if (streamRef.current) {
+          window.setTimeout(() => void tick(), 250);
+        }
+      };
+      void tick();
+    } catch {
+      stopScan();
+      setError("Could not open the camera for scanning.");
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   async function submit(result: AuditPassFail) {
     if (!lookup) return;
@@ -197,7 +280,30 @@ export function CountFlowView() {
             >
               Search
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy || scanning}
+              onClick={() => void startScan()}
+              aria-label="Scan barcode"
+            >
+              <ScanBarcodeIcon className="size-4" />
+              Scan
+            </Button>
           </div>
+          {scanning ? (
+            <div className="flex flex-col gap-2">
+              <video
+                ref={videoRef}
+                className="border-border/60 aspect-video w-full rounded-lg border bg-black object-cover"
+                muted
+                playsInline
+              />
+              <Button type="button" variant="outline" size="sm" onClick={stopScan}>
+                Stop scan
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         {error ? (

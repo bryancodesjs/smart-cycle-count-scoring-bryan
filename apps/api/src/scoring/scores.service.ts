@@ -15,7 +15,10 @@ export class ScoresService {
     }
 
     const bins = await this.prisma.bin.findMany({
-      include: { pallets: true },
+      include: {
+        pallets: true,
+        activities: true,
+      },
     });
 
     let updated = 0;
