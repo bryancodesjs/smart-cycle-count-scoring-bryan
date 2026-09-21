@@ -6,7 +6,7 @@ import {
   BIN_CAPACITY,
   formatBinAddress,
 } from "./domain";
-import { computeRiskScore } from "./risk";
+import { computeRiskBreakdown } from "./risk";
 
 function id(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -30,14 +30,16 @@ function buildPallets(
   }));
 }
 
-function scoreBin(bin: Omit<Bin, "riskScore">): Bin {
+function scoreBin(bin: Omit<Bin, "riskScore" | "riskBreakdown">): Bin {
+  const riskBreakdown = computeRiskBreakdown({
+    lastCheckedAt: bin.lastCheckedAt,
+    moveTimestamps: bin.pallets.map((p) => p.movedAt),
+    palletCount: bin.pallets.length,
+  });
   return {
     ...bin,
-    riskScore: computeRiskScore({
-      lastCheckedAt: bin.lastCheckedAt,
-      moveTimestamps: bin.pallets.map((p) => p.movedAt),
-      palletCount: bin.pallets.length,
-    }),
+    riskScore: riskBreakdown.score,
+    riskBreakdown,
   };
 }
 
@@ -124,11 +126,17 @@ export function createDemoWarehouse(): Warehouse {
     const count = Math.min(s.pallets, BIN_CAPACITY);
     bin.lastCheckedAt = daysAgo(s.checkedDaysAgo);
     bin.pallets = buildPallets(count, `SKU-${bin.code}`, s.moveDays);
-    bin.riskScore = computeRiskScore({
+    const scored = scoreBin({
+      id: bin.id,
+      code: bin.code,
+      aisleIndex: bin.aisleIndex,
+      rackIndex: bin.rackIndex,
+      binIndex: bin.binIndex,
       lastCheckedAt: bin.lastCheckedAt,
-      moveTimestamps: bin.pallets.map((p) => p.movedAt),
-      palletCount: bin.pallets.length,
+      pallets: bin.pallets,
     });
+    bin.riskScore = scored.riskScore;
+    bin.riskBreakdown = scored.riskBreakdown;
   }
 
   return base;
@@ -182,11 +190,13 @@ export function movePalletLocal(
   nextTarget.pallets = [...nextTarget.pallets, moved];
 
   for (const bin of [nextSource, nextTarget]) {
-    bin.riskScore = computeRiskScore({
+    const breakdown = computeRiskBreakdown({
       lastCheckedAt: bin.lastCheckedAt,
       moveTimestamps: bin.pallets.map((p) => p.movedAt),
       palletCount: bin.pallets.length,
     });
+    bin.riskScore = breakdown.score;
+    bin.riskBreakdown = breakdown;
   }
 
   return next;

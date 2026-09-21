@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MovePalletDto } from './dto/move-pallet.dto';
-import { BIN_CAPACITY, scoreForBin } from '../warehouses/warehouse.mapper';
+import { BIN_CAPACITY, scoreFieldsForBin } from '../warehouses/warehouse.mapper';
 
 @Injectable()
 export class PalletsService {
@@ -40,6 +40,25 @@ export class PalletsService {
         data: { binId: target.id, movedAt: now },
       });
 
+      await tx.inventoryActivity.createMany({
+        data: [
+          {
+            type: 'MOVE',
+            binId: sourceBinId,
+            palletId: pallet.id,
+            note: `Moved out to ${target.code}`,
+            createdAt: now,
+          },
+          {
+            type: 'MOVE',
+            binId: target.id,
+            palletId: pallet.id,
+            note: `Moved in from source bin`,
+            createdAt: now,
+          },
+        ],
+      });
+
       for (const binId of [sourceBinId, target.id]) {
         const bin = await tx.bin.findUnique({
           where: { id: binId },
@@ -48,9 +67,7 @@ export class PalletsService {
         if (!bin) continue;
         await tx.bin.update({
           where: { id: binId },
-          data: {
-            riskScore: scoreForBin(bin),
-          },
+          data: scoreFieldsForBin(bin),
         });
       }
     });

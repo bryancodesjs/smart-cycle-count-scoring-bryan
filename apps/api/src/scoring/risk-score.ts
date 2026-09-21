@@ -22,6 +22,23 @@ export const RISK_WINDOWS = {
   maxMovesForFullScore: 10,
 } as const;
 
+export type RiskFactorScores = {
+  daysSinceChecked: number;
+  recentMovement: number;
+  occupancy: number;
+};
+
+export type RiskBreakdown = {
+  score: number;
+  factors: RiskFactorScores;
+  weights: typeof RISK_WEIGHTS;
+  inputs: {
+    daysSinceChecked: number;
+    recentMoveCount: number;
+    palletCount: number;
+  };
+};
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -36,34 +53,56 @@ export function daysSince(date: Date, now = new Date()): number {
   return Math.max(0, diffMs / (1000 * 60 * 60 * 24));
 }
 
+export function computeRiskBreakdown(input: {
+  lastCheckedAt: Date;
+  moveTimestamps: Date[];
+  palletCount: number;
+  now?: Date;
+}): RiskBreakdown {
+  const now = input.now ?? new Date();
+  const days = daysSince(input.lastCheckedAt, now);
+  const daysSinceChecked = linearScale(days, RISK_WINDOWS.maxDaysUnchecked);
+
+  const lookbackMs =
+    RISK_WINDOWS.movementLookbackDays * 24 * 60 * 60 * 1000;
+  const recentMoveCount = input.moveTimestamps.filter(
+    (t) => now.getTime() - t.getTime() <= lookbackMs,
+  ).length;
+  const recentMovement = linearScale(
+    recentMoveCount,
+    RISK_WINDOWS.maxMovesForFullScore,
+  );
+
+  const occupancy = linearScale(input.palletCount, BIN_CAPACITY);
+
+  const factors: RiskFactorScores = {
+    daysSinceChecked: Math.round(daysSinceChecked),
+    recentMovement: Math.round(recentMovement),
+    occupancy: Math.round(occupancy),
+  };
+
+  const raw =
+    RISK_WEIGHTS.daysSinceChecked * factors.daysSinceChecked +
+    RISK_WEIGHTS.recentMovement * factors.recentMovement +
+    RISK_WEIGHTS.occupancy * factors.occupancy;
+
+  return {
+    score: Math.round(clamp(raw, 0, 100)),
+    factors,
+    weights: RISK_WEIGHTS,
+    inputs: {
+      daysSinceChecked: days,
+      recentMoveCount,
+      palletCount: input.palletCount,
+    },
+  };
+}
+
 export function computeRiskScore(input: {
   lastCheckedAt: Date;
   moveTimestamps: Date[];
   palletCount: number;
   now?: Date;
 }): number {
-  const now = input.now ?? new Date();
-  const checkedScore = linearScale(
-    daysSince(input.lastCheckedAt, now),
-    RISK_WINDOWS.maxDaysUnchecked,
-  );
-
-  const lookbackMs =
-    RISK_WINDOWS.movementLookbackDays * 24 * 60 * 60 * 1000;
-  const recentMoves = input.moveTimestamps.filter(
-    (t) => now.getTime() - t.getTime() <= lookbackMs,
-  ).length;
-  const movementScore = linearScale(
-    recentMoves,
-    RISK_WINDOWS.maxMovesForFullScore,
-  );
-
-  const occupancyScore = linearScale(input.palletCount, BIN_CAPACITY);
-
-  const raw =
-    RISK_WEIGHTS.daysSinceChecked * checkedScore +
-    RISK_WEIGHTS.recentMovement * movementScore +
-    RISK_WEIGHTS.occupancy * occupancyScore;
-
-  return Math.round(clamp(raw, 0, 100));
+  return computeRiskBreakdown(input).score;
 }

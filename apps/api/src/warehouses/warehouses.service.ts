@@ -3,8 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import {
   formatBinAddress,
+  mapBinResponse,
   mapWarehouseResponse,
-  scoreForBin,
+  scoreFieldsForBin,
 } from './warehouse.mapper';
 
 const warehouseInclude = {
@@ -42,6 +43,9 @@ export class WarehousesService {
   }
 
   async create(dto: CreateWarehouseDto) {
+    await this.prisma.auditTask.deleteMany();
+    await this.prisma.auditPlan.deleteMany();
+    await this.prisma.inventoryActivity.deleteMany();
     await this.prisma.pallet.deleteMany();
     await this.prisma.bin.deleteMany();
     await this.prisma.rack.deleteMany();
@@ -49,6 +53,7 @@ export class WarehousesService {
     await this.prisma.warehouse.deleteMany();
 
     const now = new Date();
+    const emptyScore = scoreFieldsForBin({ lastCheckedAt: now, pallets: [] });
     const warehouse = await this.prisma.warehouse.create({
       data: {
         name: dto.name.trim(),
@@ -77,10 +82,7 @@ export class WarehousesService {
                           rackIndex: ri,
                           binIndex: bi,
                           lastCheckedAt: now,
-                          riskScore: scoreForBin({
-                            lastCheckedAt: now,
-                            pallets: [],
-                          }),
+                          ...emptyScore,
                         }),
                       ),
                     },
@@ -103,19 +105,6 @@ export class WarehousesService {
       include: { pallets: { orderBy: { skuLabel: 'asc' } } },
     });
     if (!bin) throw new NotFoundException('Bin not found');
-    return {
-      id: bin.id,
-      code: bin.code,
-      aisleIndex: bin.aisleIndex,
-      rackIndex: bin.rackIndex,
-      binIndex: bin.binIndex,
-      riskScore: bin.riskScore,
-      lastCheckedAt: bin.lastCheckedAt.toISOString(),
-      pallets: bin.pallets.map((p) => ({
-        id: p.id,
-        skuLabel: p.skuLabel,
-        movedAt: p.movedAt.toISOString(),
-      })),
-    };
+    return mapBinResponse(bin);
   }
 }

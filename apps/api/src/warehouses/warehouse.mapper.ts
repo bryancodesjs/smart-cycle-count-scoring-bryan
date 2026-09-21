@@ -1,4 +1,9 @@
-import { BIN_CAPACITY, computeRiskScore } from '../scoring/risk-score';
+import {
+  BIN_CAPACITY,
+  computeRiskBreakdown,
+  computeRiskScore,
+  type RiskBreakdown,
+} from '../scoring/risk-score';
 
 type PalletRow = { id: string; skuLabel: string; movedAt: Date };
 type BinRow = {
@@ -8,6 +13,9 @@ type BinRow = {
   rackIndex: number;
   binIndex: number;
   riskScore: number;
+  factorDaysSinceChecked?: number;
+  factorRecentMovement?: number;
+  factorOccupancy?: number;
   lastCheckedAt: Date;
   pallets: PalletRow[];
 };
@@ -35,6 +43,62 @@ export type WarehouseTree = {
   aisles: AisleRow[];
 };
 
+export function mapRiskBreakdown(bin: BinRow): RiskBreakdown {
+  if (
+    bin.factorDaysSinceChecked != null &&
+    bin.factorRecentMovement != null &&
+    bin.factorOccupancy != null
+  ) {
+    const breakdown = computeRiskBreakdown({
+      lastCheckedAt: bin.lastCheckedAt,
+      moveTimestamps: bin.pallets.map((p) => p.movedAt),
+      palletCount: bin.pallets.length,
+    });
+    return {
+      ...breakdown,
+      score: bin.riskScore,
+      factors: {
+        daysSinceChecked: bin.factorDaysSinceChecked,
+        recentMovement: bin.factorRecentMovement,
+        occupancy: bin.factorOccupancy,
+      },
+    };
+  }
+  return computeRiskBreakdown({
+    lastCheckedAt: bin.lastCheckedAt,
+    moveTimestamps: bin.pallets.map((p) => p.movedAt),
+    palletCount: bin.pallets.length,
+  });
+}
+
+export function mapBinResponse(bin: BinRow) {
+  const breakdown = mapRiskBreakdown(bin);
+  return {
+    id: bin.id,
+    code: bin.code,
+    aisleIndex: bin.aisleIndex,
+    rackIndex: bin.rackIndex,
+    binIndex: bin.binIndex,
+    riskScore: bin.riskScore,
+    lastCheckedAt: bin.lastCheckedAt.toISOString(),
+    pallets: bin.pallets.map((p) => ({
+      id: p.id,
+      skuLabel: p.skuLabel,
+      movedAt: p.movedAt.toISOString(),
+    })),
+    riskBreakdown: {
+      score: breakdown.score,
+      factors: breakdown.factors,
+      weights: breakdown.weights,
+      inputs: {
+        daysSinceChecked: breakdown.inputs.daysSinceChecked,
+        recentMoveCount: breakdown.inputs.recentMoveCount,
+        palletCount: breakdown.inputs.palletCount,
+      },
+    },
+  };
+}
+
 export function mapWarehouseResponse(warehouse: WarehouseTree) {
   return {
     id: warehouse.id,
@@ -52,25 +116,30 @@ export function mapWarehouseResponse(warehouse: WarehouseTree) {
         code: rack.code,
         aisleIndex: rack.aisleIndex,
         rackIndex: rack.rackIndex,
-        bins: rack.bins.map((bin) => ({
-          id: bin.id,
-          code: bin.code,
-          aisleIndex: bin.aisleIndex,
-          rackIndex: bin.rackIndex,
-          binIndex: bin.binIndex,
-          riskScore: bin.riskScore,
-          lastCheckedAt: bin.lastCheckedAt.toISOString(),
-          pallets: bin.pallets.map((p) => ({
-            id: p.id,
-            skuLabel: p.skuLabel,
-            movedAt: p.movedAt.toISOString(),
-          })),
-        })),
+        bins: rack.bins.map((bin) => mapBinResponse(bin)),
       })),
     })),
   };
 }
 
+export function scoreFieldsForBin(bin: {
+  lastCheckedAt: Date;
+  pallets: { movedAt: Date }[];
+}) {
+  const breakdown = computeRiskBreakdown({
+    lastCheckedAt: bin.lastCheckedAt,
+    moveTimestamps: bin.pallets.map((p) => p.movedAt),
+    palletCount: bin.pallets.length,
+  });
+  return {
+    riskScore: breakdown.score,
+    factorDaysSinceChecked: breakdown.factors.daysSinceChecked,
+    factorRecentMovement: breakdown.factors.recentMovement,
+    factorOccupancy: breakdown.factors.occupancy,
+  };
+}
+
+/** @deprecated use scoreFieldsForBin */
 export function scoreForBin(bin: {
   lastCheckedAt: Date;
   pallets: { movedAt: Date }[];

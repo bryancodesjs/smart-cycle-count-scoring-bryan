@@ -25,7 +25,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { RiskBreakdownPanel } from "@/components/risk-breakdown-panel";
 import { cn } from "@/lib/utils";
+import { breakdownForBin } from "@/lib/risk";
 import {
   CircleCheckIcon,
   SquareCheckIcon,
@@ -147,6 +149,10 @@ export function BinDetailSheet({ warehouse, bin, open, onOpenChange }: Props) {
                   </dd>
                 </div>
               </dl>
+
+              <Separator />
+
+              <RiskBreakdownPanel breakdown={breakdownForBin(bin)} />
 
               {successMessage ? (
                 <div

@@ -10,11 +10,25 @@ import { BinDetailSheet } from "@/components/bin-detail-sheet";
 import { RiskLegend } from "@/components/risk-legend";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function DashboardView() {
-  const { warehouse, loading, source, loadDemo, refresh } = useWarehouse();
+  const {
+    warehouse,
+    loading,
+    source,
+    loadDemo,
+    refresh,
+    recomputeScores,
+    createAuditPlan,
+  } = useWarehouse();
   const [selectedBinId, setSelectedBinId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [topN, setTopN] = useState(5);
+  const [busy, setBusy] = useState<"recompute" | "plan" | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const selectedBin: Bin | null = useMemo(() => {
     if (!warehouse || !selectedBinId) return null;
@@ -39,6 +53,36 @@ export function DashboardView() {
   function onSelectBin(bin: Bin) {
     setSelectedBinId(bin.id);
     setSheetOpen(true);
+  }
+
+  async function onRecompute() {
+    setBusy("recompute");
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      await recomputeScores();
+      setActionMessage("Scores recomputed. Heatmap updated.");
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Recompute failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onCreatePlan() {
+    setBusy("plan");
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const plan = await createAuditPlan(topN);
+      setActionMessage(
+        `Audit plan created with ${plan.tasks.length} tasks. Open Audit Plan to review.`,
+      );
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not create plan");
+    } finally {
+      setBusy(null);
+    }
   }
 
   if (loading) {
@@ -87,6 +131,14 @@ export function DashboardView() {
           <Badge variant="outline" className="font-mono text-[10px]">
             {source === "api" ? "API" : "LOCAL"}
           </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy !== null}
+            onClick={() => void onRecompute()}
+          >
+            {busy === "recompute" ? "Recomputing…" : "Recompute scores"}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => void refresh()}>
             Refresh
           </Button>
@@ -118,6 +170,50 @@ export function DashboardView() {
           ))}
         </div>
       ) : null}
+
+      <div className="border-border/60 bg-muted/20 flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="top-n" className="font-mono text-xs">
+            Create audit plan — Top N risky bins
+          </Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              id="top-n"
+              type="number"
+              min={1}
+              max={50}
+              value={topN}
+              onChange={(e) => setTopN(Number(e.target.value) || 1)}
+              className="w-20"
+            />
+            <Button
+              size="sm"
+              disabled={busy !== null}
+              onClick={() => void onCreatePlan()}
+            >
+              {busy === "plan" ? "Creating…" : "Generate audit plan"}
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/audit">View plan</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/count">Count flow</Link>
+            </Button>
+          </div>
+        </div>
+        {(actionMessage || actionError) && (
+          <p
+            role={actionError ? "alert" : "status"}
+            className={
+              actionError
+                ? "text-destructive text-sm"
+                : "text-sm font-medium"
+            }
+          >
+            {actionError || actionMessage}
+          </p>
+        )}
+      </div>
 
       <div className="border-border/50 flex flex-wrap items-center justify-between gap-3 border-y py-2">
         <RiskLegend />

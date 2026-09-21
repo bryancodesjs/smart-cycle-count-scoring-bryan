@@ -6,8 +6,10 @@ import { useWarehouse } from "@/components/warehouse-provider";
 import { listBins } from "@/lib/warehouse";
 import { BIN_CAPACITY } from "@/lib/domain";
 import { RiskBadge } from "@/components/risk-legend";
-import { daysSince } from "@/lib/risk";
+import { RiskBreakdownPanel } from "@/components/risk-breakdown-panel";
+import { daysSince, breakdownForBin } from "@/lib/risk";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 export default function BinPage({
   params,
@@ -60,6 +62,12 @@ export default function BinPage({
           {daysSince(bin.lastCheckedAt).toFixed(1)} days since check
         </span>
       </div>
+
+      <Separator />
+
+      <RiskBreakdownPanel breakdown={breakdownForBin(bin)} />
+
+      <Separator />
 
       <section>
         <h2 className="mb-2 font-mono text-xs tracking-wider uppercase">
