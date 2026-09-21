@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
-import { computeRiskScore } from '../src/scoring/risk-score';
+import { PrismaClient, type ActivityType } from '@prisma/client';
+import { computeRiskBreakdown } from '../src/scoring/risk-score';
 
 const prisma = new PrismaClient();
 
@@ -15,14 +15,18 @@ function formatBinAddress(ai: number, ri: number, bi: number): string {
 }
 
 async function main() {
+  await prisma.auditTask.deleteMany();
+  await prisma.auditPlan.deleteMany();
+  await prisma.inventoryActivity.deleteMany();
   await prisma.pallet.deleteMany();
   await prisma.bin.deleteMany();
   await prisma.rack.deleteMany();
   await prisma.aisle.deleteMany();
   await prisma.warehouse.deleteMany();
 
+  // ≈30 bins: 3 aisles × 2 racks × 5 bins
   const aisleCount = 3;
-  const racksPerAisle = 4;
+  const racksPerAisle = 2;
   const binsPerRack = 5;
 
   const warehouse = await prisma.warehouse.create({
@@ -80,6 +84,11 @@ async function main() {
     code: string;
     checkedDaysAgo: number;
     pallets: Array<{ sku: string; movedDaysAgo: number }>;
+    activities: Array<{
+      type: ActivityType;
+      daysAgo: number;
+      note: string;
+    }>;
   }> = [
     {
       code: 'A01-R01-B01',
@@ -90,6 +99,12 @@ async function main() {
         { sku: 'SKU-A01-03', movedDaysAgo: 1 },
         { sku: 'SKU-A01-04', movedDaysAgo: 0 },
       ],
+      activities: [
+        { type: 'PUTAWAY', daysAgo: 25, note: 'Inbound putaway' },
+        { type: 'MOVE', daysAgo: 14, note: 'Slot consolidation' },
+        { type: 'PICK', daysAgo: 3, note: 'Outbound pick' },
+        { type: 'ADJUST', daysAgo: 2, note: 'Cycle variance adjust' },
+      ],
     },
     {
       code: 'A01-R01-B02',
@@ -97,6 +112,10 @@ async function main() {
       pallets: [
         { sku: 'SKU-A01-05', movedDaysAgo: 3 },
         { sku: 'SKU-A01-06', movedDaysAgo: 5 },
+      ],
+      activities: [
+        { type: 'PUTAWAY', daysAgo: 20, note: 'Putaway' },
+        { type: 'PICK', daysAgo: 6, note: 'Pick' },
       ],
     },
     {
@@ -106,6 +125,10 @@ async function main() {
         { sku: 'SKU-A01-07', movedDaysAgo: 1 },
         { sku: 'SKU-A01-08', movedDaysAgo: 1 },
         { sku: 'SKU-A01-09', movedDaysAgo: 2 },
+      ],
+      activities: [
+        { type: 'PUTAWAY', daysAgo: 10, note: 'Putaway' },
+        { type: 'MOVE', daysAgo: 4, note: 'Re-slot' },
       ],
     },
     {
@@ -117,18 +140,27 @@ async function main() {
         { sku: 'SKU-A02-03', movedDaysAgo: 2 },
         { sku: 'SKU-A02-04', movedDaysAgo: 3 },
       ],
+      activities: [
+        { type: 'PUTAWAY', daysAgo: 22, note: 'Bulk putaway' },
+        { type: 'ADJUST', daysAgo: 8, note: 'Damage adjust' },
+        { type: 'PICK', daysAgo: 1, note: 'Pick wave' },
+      ],
     },
     {
-      code: 'A02-R04-B05',
+      code: 'A02-R02-B05',
       checkedDaysAgo: 25,
       pallets: [
         { sku: 'SKU-A02-05', movedDaysAgo: 1 },
         { sku: 'SKU-A02-06', movedDaysAgo: 0 },
         { sku: 'SKU-A02-07', movedDaysAgo: 2 },
       ],
+      activities: [
+        { type: 'MOVE', daysAgo: 18, note: 'Moved from A01' },
+        { type: 'PICK', daysAgo: 2, note: 'Pick' },
+      ],
     },
     {
-      code: 'A03-R02-B03',
+      code: 'A03-R01-B03',
       checkedDaysAgo: 18,
       pallets: [
         { sku: 'SKU-A03-01', movedDaysAgo: 1 },
@@ -136,14 +168,25 @@ async function main() {
         { sku: 'SKU-A03-03', movedDaysAgo: 1 },
         { sku: 'SKU-A03-04', movedDaysAgo: 1 },
       ],
+      activities: [
+        { type: 'PUTAWAY', daysAgo: 19, note: 'Putaway' },
+        { type: 'ADJUST', daysAgo: 7, note: 'Qty adjust' },
+        { type: 'MOVE', daysAgo: 1, note: 'Internal move' },
+      ],
     },
     {
-      code: 'A03-R04-B02',
+      code: 'A03-R02-B02',
       checkedDaysAgo: 30,
       pallets: [
         { sku: 'SKU-A03-05', movedDaysAgo: 0 },
         { sku: 'SKU-A03-06', movedDaysAgo: 0 },
         { sku: 'SKU-A03-07', movedDaysAgo: 1 },
+      ],
+      activities: [
+        { type: 'PUTAWAY', daysAgo: 29, note: 'Stale putaway' },
+        { type: 'PICK', daysAgo: 15, note: 'Old pick' },
+        { type: 'ADJUST', daysAgo: 4, note: 'Shrink adjust' },
+        { type: 'MOVE', daysAgo: 0, note: 'Recent move' },
       ],
     },
   ];
@@ -166,23 +209,40 @@ async function main() {
         },
       });
     }
+
+    for (const a of s.activities) {
+      await prisma.inventoryActivity.create({
+        data: {
+          binId,
+          type: a.type,
+          note: a.note,
+          createdAt: daysAgo(a.daysAgo),
+        },
+      });
+    }
   }
 
   const bins = await prisma.bin.findMany({ include: { pallets: true } });
   for (const bin of bins) {
-    const riskScore = computeRiskScore({
+    const breakdown = computeRiskBreakdown({
       lastCheckedAt: bin.lastCheckedAt,
       moveTimestamps: bin.pallets.map((p) => p.movedAt),
       palletCount: bin.pallets.length,
     });
     await prisma.bin.update({
       where: { id: bin.id },
-      data: { riskScore },
+      data: {
+        riskScore: breakdown.score,
+        factorDaysSinceChecked: breakdown.factors.daysSinceChecked,
+        factorRecentMovement: breakdown.factors.recentMovement,
+        factorOccupancy: breakdown.factors.occupancy,
+      },
     });
   }
 
+  const activityCount = await prisma.inventoryActivity.count();
   console.log(
-    `Seeded warehouse "${warehouse.name}" with ${bins.length} bins and demo pallets.`,
+    `Seeded warehouse "${warehouse.name}" with ${bins.length} bins, demo pallets, and ${activityCount} activity events.`,
   );
 }
 
