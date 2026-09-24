@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useWarehouse } from "@/components/warehouse-provider";
+import { DataSourceBadge } from "@/components/data-source-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useWarehouse } from "@/components/warehouse-provider";
-import { Badge } from "@/components/ui/badge";
 
 const links = [
   { href: "/", label: "Dashboard" },
@@ -23,11 +24,8 @@ export function AppHeader() {
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/" className="group flex min-w-0 flex-col">
-            <span className="text-muted-foreground font-mono text-[10px] tracking-[0.2em] uppercase">
-              Smart Cycle Count
-            </span>
             <span className="truncate text-sm font-semibold tracking-tight sm:text-base">
-              Scoring
+              SCS
             </span>
           </Link>
           {warehouse ? (
@@ -35,6 +33,7 @@ export function AppHeader() {
               {warehouse.name}
             </Badge>
           ) : null}
+          <DataSourceBadge source={source} className="hidden sm:inline-flex" />
         </div>
 
         <nav className="flex items-center gap-1">
@@ -55,12 +54,7 @@ export function AppHeader() {
               </Button>
             );
           })}
-          <Badge
-            variant="outline"
-            className="ml-1 hidden font-mono text-[10px] md:inline-flex"
-          >
-            {source === "api" ? "LIVE" : "LOCAL"}
-          </Badge>
+          <DataSourceBadge source={source} className="ml-1 sm:hidden" />
         </nav>
       </div>
     </header>

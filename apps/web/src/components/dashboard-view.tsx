@@ -9,7 +9,6 @@ import { WarehouseGrid } from "@/components/warehouse-grid";
 import { BinDetailSheet } from "@/components/bin-detail-sheet";
 import { RiskLegend } from "@/components/risk-legend";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -17,7 +16,6 @@ export function DashboardView() {
   const {
     warehouse,
     loading,
-    source,
     loadDemo,
     refresh,
     recomputeScores,
@@ -76,7 +74,7 @@ export function DashboardView() {
     try {
       const plan = await createAuditPlan(topN);
       setActionMessage(
-        `Audit plan created with ${plan.tasks.length} tasks. Open Audit Plan to review.`,
+        `Audit plan created with ${plan.tasks.length} tasks. Open Audit in the nav to review.`,
       );
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Could not create plan");
@@ -128,9 +126,6 @@ export function DashboardView() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="font-mono text-[10px]">
-            {source === "api" ? "API" : "LOCAL"}
-          </Badge>
           <Button
             variant="outline"
             size="sm"
@@ -141,9 +136,6 @@ export function DashboardView() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => void refresh()}>
             Refresh
-          </Button>
-          <Button asChild size="sm" variant="secondary">
-            <Link href="/setup">Edit setup</Link>
           </Button>
         </div>
       </div>
@@ -192,12 +184,6 @@ export function DashboardView() {
               onClick={() => void onCreatePlan()}
             >
               {busy === "plan" ? "Creating…" : "Generate audit plan"}
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/audit">View plan</Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/count">Count flow</Link>
             </Button>
           </div>
         </div>

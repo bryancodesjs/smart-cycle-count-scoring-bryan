@@ -1,69 +1,111 @@
-# Smart Cycle Count Scoring — Bryan
+# Smart Cycle Count Scoring
 
-Monorepo for a warehouse cycle-count risk scoring app (Next.js + NestJS + Prisma + Postgres).
+Warehouse cycle-count risk scoring MVP: heatmap dashboard, audit plans, and mobile count flow.
 
-## Structure
+**Stack:** Next.js (`apps/web`) · NestJS + Prisma (`apps/api`) · Postgres
 
-- `apps/web` — Next.js UI (shadcn + Tailwind) with BFF proxy routes
-- `apps/api` — NestJS REST API + Prisma → Postgres
+---
 
-## Quick start (local Postgres via Docker)
+## Prerequisites
+
+- Node.js 20+
+- Docker (for local Postgres)
+
+---
+
+## Install, seed, and run
+
+### 1. Start Postgres
 
 ```bash
 docker compose up -d
-cp apps/api/.env.example apps/api/.env
-# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/smart_cycle_count
+```
 
+### 2. Configure environment
+
+```bash
+# API
+cp apps/api/.env.example apps/api/.env
+```
+
+Set `DATABASE_URL` in `apps/api/.env` to the local Docker database:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/smart_cycle_count
+PORT=3001
+```
+
+```bash
+# Web (BFF → API)
+cp apps/web/.env.example apps/web/.env.local
+```
+
+`apps/web/.env.local` should contain:
+
+```env
+API_BASE_URL=http://localhost:3001
+```
+
+### 3. Install dependencies
+
+```bash
 cd apps/api && npm install && cd ../..
 cd apps/web && npm install && cd ../..
+```
 
+### 4. Migrate and seed
+
+```bash
 npm run prisma:generate
 npm run prisma:migrate
 npm run seed
-
-npm run dev:api   # :3001
-npm run dev:web   # :3000
 ```
 
-Open http://localhost:3000 — dashboard loads from the API when available; otherwise falls back to a local demo warehouse.
+Seed creates ~30 bins, demo pallets, ~1 month of putaway / pick / adjust / move activity, and initial risk scores.
 
-## MVP flows
+### 5. Run the app
 
-1. **Heatmap dashboard (`/`)** — color-coded bins (green → red by risk). Click a bin for score, factor breakdown (“why”), pallets, and moves.
-2. **Recompute scores** — dashboard button calls `POST /scores/recompute` and refreshes the map.
-3. **Audit plan (`/audit`)** — create Top N risky bins as tasks (`PENDING` / `DONE`).
-4. **Count flow (`/count`)** — mobile-friendly: search or scan bin code, review expected pallets, enter counted qty, mark Pass/Fail (updates `lastCheckedAt` + last result + recomputes that bin; completes matching plan task when present).
+In two terminals (from repo root):
 
-## Risk score (v1)
+```bash
+npm run dev:api   # API → http://localhost:3001
+npm run dev:web   # UI  → http://localhost:3000
+```
 
-`0` green → `100` red:
+Open **http://localhost:3000**
 
-| Factor | Weight | Scale |
+| Page | What it does |
+| --- | --- |
+| `/` | Heatmap dashboard — click a bin for score breakdown; **Recompute scores** |
+| `/audit` | Create Top N audit plan + task list |
+| `/count` | Mobile count flow — search bin, enter qty, Pass/Fail |
+
+---
+
+## Scoring factors
+
+Each bin gets a **risk score from 0–100** (green → yellow → red). Higher = audit sooner.
+
+Factors are scored 0–100 individually, then combined with fixed weights:
+
+| Factor | Weight | How it scales |
 | --- | --- | --- |
-| Days since last audited | 35% | 0→100 over 0–30 days |
-| Putaway / pick / move | 25% | 0→100 over 0–8 events in 30 days |
-| Adjustments | 15% | 0→100 over 0–3 adjusts in 30 days |
-| Occupancy | 15% | pallets / capacity (4) × 100 |
-| Last audit failed | 10% | 100 after FAIL until a later PASS |
+| Days since last audited | **35%** | 0 → 100 over 0–30 days unchecked |
+| Activity (putaway + pick + move) | **25%** | 0 → 100 over 0–8 events in the last 30 days |
+| Adjustments | **15%** | 0 → 100 over 0–3 adjustments in the last 30 days |
+| Occupancy | **15%** | `(pallets / capacity)` × 100 (capacity = 4) |
+| Last audit failed | **10%** | 100 after FAIL until a later PASS |
 
-Factor scores are persisted on each bin and shown in the bin drawer / detail page.
+**Combined score:**
 
-See `apps/api/src/scoring/risk-score.ts` and `apps/web/PROMPT.md`.
+```
+score =
+  0.35 × daysSinceChecked
++ 0.25 × activity
++ 0.15 × adjustment
++ 0.15 × occupancy
++ 0.10 × failedAudit
+```
 
-## API (Nest)
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/warehouses/current` | Warehouse tree + scores |
-| POST | `/warehouses` | Replace warehouse layout |
-| GET | `/bins/:id` | Bin detail + breakdown |
-| POST | `/pallets/move` | Move pallet |
-| POST | `/scores/recompute` | Recompute all bin scores |
-| POST | `/audit-plans` | Create Top N plan |
-| GET | `/audit-plans/current` | Latest plan + tasks |
-| GET | `/audits/bins/:code` | Lookup bin for count flow |
-| POST | `/audits/count` | Record count + pass/fail |
-
-## Seed
-
-`npm run seed` creates ~30 bins (3×2×5), demo pallets, ~last-month inventory activities (putaway / pick / adjust / move), and computed risk scores.
+Factor scores are stored on each bin and shown in the bin drawer / detail (“why this score”).  
+Implementation: `apps/api/src/scoring/risk-score.ts`

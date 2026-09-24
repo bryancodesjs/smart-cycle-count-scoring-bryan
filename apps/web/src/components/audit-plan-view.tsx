@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useWarehouse } from "@/components/warehouse-provider";
+import { PageBackLink } from "@/components/page-back-link";
 import { RiskBadge } from "@/components/risk-legend";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 export function AuditPlanView() {
   const {
@@ -15,7 +16,6 @@ export function AuditPlanView() {
     loading,
     createAuditPlan,
     refreshAuditPlan,
-    source,
   } = useWarehouse();
   const [topN, setTopN] = useState(5);
   const [busy, setBusy] = useState(false);
@@ -54,7 +54,8 @@ export function AuditPlanView() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3">
+        <PageBackLink href="/">Dashboard</PageBackLink>
         <div>
           <p className="text-muted-foreground font-mono text-[10px] tracking-[0.25em] uppercase">
             Cycle count
@@ -63,20 +64,8 @@ export function AuditPlanView() {
             Audit plan
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Top-N risky bins become tasks. Complete them in the mobile count
-            flow.
+            Top-N risky bins become tasks. Complete them in the Count flow.
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="font-mono text-[10px]">
-            {source === "api" ? "LIVE" : "LOCAL"}
-          </Badge>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/count">Open count flow</Link>
-          </Button>
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/">Dashboard</Link>
-          </Button>
         </div>
       </div>
 

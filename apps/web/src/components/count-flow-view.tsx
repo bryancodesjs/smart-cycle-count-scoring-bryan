@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useWarehouse } from "@/components/warehouse-provider";
+import { PageBackLink } from "@/components/page-back-link";
 import { listBins } from "@/lib/warehouse";
 import type { AuditPassFail, Pallet } from "@/lib/domain";
 import { RiskBadge } from "@/components/risk-legend";
@@ -220,26 +220,22 @@ export function CountFlowView() {
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-5 px-4 py-6 sm:px-6">
-      <div>
-        <p className="text-muted-foreground font-mono text-[10px] tracking-[0.25em] uppercase">
-          Mobile count
-        </p>
-        <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">
-          Count a bin
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Search or scan a bin code, confirm expected pallets, enter counted
-          quantity, then mark pass or fail.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline" size="sm">
-          <Link href="/audit">Audit plan</Link>
-        </Button>
-        <Button asChild variant="secondary" size="sm">
-          <Link href="/">Dashboard</Link>
-        </Button>
+      <div className="flex flex-col gap-3">
+        <PageBackLink href={taskId ? "/audit" : "/"}>
+          {taskId ? "Audit plan" : "Dashboard"}
+        </PageBackLink>
+        <div>
+          <p className="text-muted-foreground font-mono text-[10px] tracking-[0.25em] uppercase">
+            Mobile count
+          </p>
+          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">
+            Count a bin
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Search or scan a bin code, confirm expected pallets, enter counted
+            quantity, then mark pass or fail.
+          </p>
+        </div>
       </div>
 
       {success ? (
